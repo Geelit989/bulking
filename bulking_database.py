@@ -3,8 +3,8 @@ import pandas as pd
 import sqlite3
 
 # Create db instance, connection and cursor to db instance
-name = "bulking.db"
-con = sqlite3.connect(":memory:")
+name = "bulking"
+con = sqlite3.connect(":memory:") # CHANGE TO "BULKING.DB" WHEN IT'S TIME TO DEPLOY TO PROD
 cur = con.cursor()
 
 # Functions to insert data
@@ -12,13 +12,17 @@ def insert_data(data):
     '''
     ---
     data = tuple
-    if inserting multiple rows uses executemany
+    If inserting multiple rows uses executemany
     '''
+    len_of_data = len(data)
+    marks = '?' * len_of_data
+
+
     if len(data) > 1:
-        cur.execute("INSERT INTO bulking VALUES(?)",data)
+        cur.execute(f"INSERT INTO {name} VALUES({marks})",data)
     else:
         cur.executemany(
-            "INSERT INTO data VALUES(?,?,?)",data)
+            f"INSERT INTO data VALUES({marks})",data)
 
 def collect_user_data():
     current_weight = float(input("Enter your current weight: "))
@@ -37,13 +41,17 @@ def run_collect_user_data():
 
 try:
     # Check if database is already created
-    res = cur.execute("SELECT name FROM sqlite_master WHERE name='bulking'")
+    res = cur.execute(f"SELECT name FROM sqlite_master WHERE name={name}")
     table_exists = res.fetchone()
     if table_exists is None:
-        print('Bulking does not exist, creating Bulking.')
-        cur.execute("CREATE TABLE bulking(date, weight, workout_days, missed_meals, protein, creatine)")
+        print('-' * 45)
+        print('\n\tBulking does not exist, creating Bulking.\n')
+        print('-' * 45)
+        cur.execute(f"CREATE TABLE {name}(date, weight, workout_days, missed_meals, protein, creatine)")
         data_tuple = run_collect_user_data()
-        print("Entering data into database..")
+        print('-' * 45)
+        print("\n\tEntering data into database..\n")
+        print('-' * 45)
         cur.execute("INSERT INTO bulking VALUES (?,?,?,?,?,?)", data_tuple)
         
     else: # Insert data into db
@@ -52,7 +60,9 @@ try:
         cur.execute("INSERT INTO bulking VALUES (?,?,?,?,?,?)", data_tuple)
 
     # Commit changes to the db
-    print("Committing changes...")
+    print('-' * 45)
+    print("\n\tCommitting changes...")
+    print('-' * 45)
     con.commit()
 
 except sqlite3.Error as e:
@@ -61,11 +71,15 @@ except sqlite3.Error as e:
 
 finally:
     # Check for recent insert
-    print("Most recent inserts, descending:")
+    print('-' * 45)
+    print("\n\tMost recent inserts, descending:")
+    print('-' * 45)
     for row in con.execute("SELECT date, weight FROM bulking ORDER BY date"):
         print(row)
     # Close connection to db
-    print("Closing the connection to Bulking..")
+    print('-' * 45)
+    print("\n\t215Closing the connection to Bulking..")
+    print('-' * 45)
     con.close()
 
 
