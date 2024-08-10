@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import re
+import numpy as np
 
 class BulkingDataPipeline:
     def __init__(self, db_name):
@@ -21,7 +22,11 @@ class BulkingDataPipeline:
         Returns:
         str: The cleaned numerical data.
         """
-        return re.sub(r'[^\d.]+', '', weight)
+        try:
+            return re.sub(r'[^\d.]+', '', weight)
+        except ValueError as e:
+            print("An error occurred during weight cleaning:")
+            return np.nan
     
     def ingest_raw_data(self, csv_path, raw_table_name):
         try:
@@ -41,23 +46,39 @@ class BulkingDataPipeline:
 
             # Perform transformations and cleaning
             raw_data['Date'] = pd.to_datetime(raw_data['Date'], format='%b%d%Y', errors='coerce')
-            raw_data['Weight(lbs)'] = raw_data['Weight(lbs)'].astype(str).apply(self.clean_numerical).astype(float).round(1)
-            raw_data['Workout_days'] = raw_data['Workout_days'].astype(float).round(1)
-            raw_data['Missed_meals'] = raw_data['Missed_meals'].astype(float).round(1)
-            raw_data['Protein'] = raw_data['Protein'].astype(int)
-            raw_data['Creatine'] = raw_data['Creatine'].astype(int)
+            raw_data['weight(lbs)'] = raw_data['weight(lbs)'].astype(str).apply(self.clean_numerical).astype(float).round(1)
+            raw_data['workout_days'] = raw_data['workout_days'].astype(float).round(1)
+            raw_data['missed_meals'] = raw_data['missed_meals'].astype(str).apply(self.clean_numerical).astype(float).round(1)
+            raw_data['protein'] = raw_data['protein'].astype(int)
+            raw_data['creatine'] = raw_data['creatine'].astype(int)
 
             # Insert transformed data into silver table
             raw_data.to_sql(silver_table_name, self.con, if_exists='replace', index=False)
             print("Data transformed and inserted into the silver table.")
+        except AttributeError as e:
+            print('There was an error with the transformation function:', e)
+        except sqlite3.OperationalError as e:
+            print('There was an error with the SQLite operation:', e)
         except Exception as e:
             print("An error occurred during data transformation:", e)
+            # Print out problematic rows for debugging
+            problematic_rows = raw_data[pd.to_numeric(raw_data['Weight(lbs)'], errors='coerce').isnull()]
+            if not problematic_rows.empty:
+                print("Problematic rows in 'Weight(lbs)' column:")
+                print(problematic_rows)
 
-    
     def run_pipeline(self, csv_path, raw_table_name, silver_table_name):
         self.ingest_raw_data(csv_path, raw_table_name)
         self.transform_and_ingest(raw_table_name, silver_table_name)
 
+# Create congifuration file for the pipeline
+config = {
+    "db_name": "bulking_database.db",
+    "csv_path": "/Users/geraldlittlejr/Documents/vs_files/bulking/bulking_file.txt",
+    "raw_table_name": "bulking_database",
+    "silver_table_name": "bulking_table_silver"
+}
+
 # Example usage:
 pipeline = BulkingDataPipeline("bulking_database.db")
-pipeline.run_pipeline("/Users/geraldlittlejr/Documents/vs_files/bulking/bulking_file.txt", "bulking_table", "bulking_table_silver")
+pipeline.run_pipeline("/Users/geraldlittlejr/Documents/vs_files/bulking/bulking_file.txt", "bulking_database", "bulking_table_silver")
